@@ -48,7 +48,7 @@ func NewClient() *Client {
 	return vc
 }
 
-func (c Client) Get(p string) (*Secret, error) {
+func (c Client) GetSecret(p string) (*Secret, error) {
 	s, err := c.Secrets.KvV2Read(context.Background(), p, vault.WithMountPath(c.MountPath))
 	if err != nil {
 		return nil, err

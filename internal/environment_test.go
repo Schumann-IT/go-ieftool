@@ -13,7 +13,7 @@ func Test_NewEnvironmentsWithoutFilter(t *testing.T) {
 	}
 
 	if e.Len() == 1 {
-		t.Fatalf("expect more than one environment, got %d", e.Len())
+		t.Fatalf("expect more than one envigronment, got %d", e.Len())
 	}
 }
 

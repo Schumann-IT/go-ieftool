@@ -14,7 +14,7 @@ var list = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		e := internal.MustNewEnvironmentsFromFlags(cmd.Flags())
 
-		ps, err := e.ListRemotePolicies()
+		ps, err := e.FetchRemotePolicies()
 		if err != nil {
 			log.Fatalf("Failed to list policies %v", err)
 		}

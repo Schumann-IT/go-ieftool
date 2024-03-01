@@ -33,7 +33,7 @@ type EnvironmentSaml struct {
 
 type Environment struct {
 	Name                                   string                 `yaml:"name"`
-	AppName                                string                 `yaml:"appName"`
+	SecretPath                             string                 `yaml:"secretPath"`
 	IsProduction                           bool                   `yaml:"isProduction"`
 	Tenant                                 string                 `yaml:"tenant"`
 	TenantId                               string                 `yaml:"tenantId"`
@@ -250,21 +250,6 @@ func NewEnvironmentsFromConfig(p string, n string) (*Environments, error) {
 	es.e = e
 	es.filter(n)
 
-	vc := vault.NewClient()
-	for i, _ := range es.e {
-		sp := fmt.Sprintf("/azure/applications/b2c/%s/%s", es.e[i].AppName, es.e[i].Name)
-		s, err := vc.Get(sp)
-		if err != nil {
-			return nil, errors.New(fmt.Sprintf("could not find secret %s: %s", sp, err.Error()))
-		}
-		es.e[i].Secret = s
-		c, err := msgraph.NewClient(es.e[i].TenantId, es.e[i].Secret.ClientId, es.e[i].Secret.ClientSecret)
-		if err != nil {
-			return nil, fmt.Errorf("could not create graph client credentials: %s", err.Error())
-		}
-		es.e[i].GraphClient = c
-	}
-
 	return &es, nil
 }
 
@@ -286,9 +271,49 @@ func (es *Environments) Build(s string, d string) error {
 	return nil
 }
 
-func (es *Environments) Deploy(d string) error {
-	es.d = d
+func (es *Environments) FetchSecrets() error {
+	vc := vault.NewClient()
 
+	for i, _ := range es.e {
+		if es.e[i].Secret == nil {
+			sp := fmt.Sprintf("%s/%s", es.e[i].SecretPath, es.e[i].Name)
+			s, err := vc.GetSecret(sp)
+			if err != nil {
+				return errors.New(fmt.Sprintf("could not find secret %s: %s", sp, err.Error()))
+			}
+			es.e[i].Secret = s
+		}
+	}
+
+	return nil
+}
+
+func (es *Environments) CreateGraphClients() error {
+	err := es.FetchSecrets()
+	if err != nil {
+		return err
+	}
+
+	for i, _ := range es.e {
+		if es.e[i].GraphClient == nil {
+			c, err := msgraph.NewClient(es.e[i].TenantId, es.e[i].Secret.ClientId, es.e[i].Secret.ClientSecret)
+			if err != nil {
+				return fmt.Errorf("could not create graph client: %s", err.Error())
+			}
+			es.e[i].GraphClient = c
+		}
+	}
+
+	return nil
+}
+
+func (es *Environments) Deploy(d string) error {
+	err := es.CreateGraphClients()
+	if err != nil {
+		return err
+	}
+
+	es.d = d
 	for _, e := range es.e {
 		err := e.Deploy(es.d)
 		if err != nil {
@@ -311,9 +336,13 @@ func (es *Environments) filter(n string) {
 	es.e = ne
 }
 
-func (es *Environments) ListRemotePolicies() (map[string][]string, error) {
-	var errs Errors
+func (es *Environments) FetchRemotePolicies() (map[string][]string, error) {
+	err := es.CreateGraphClients()
+	if err != nil {
+		return nil, err
+	}
 
+	var errs Errors
 	r := map[string][]string{}
 	for _, e := range es.e {
 		ps, err := e.ListRemotePolicies()
@@ -331,8 +360,12 @@ func (es *Environments) ListRemotePolicies() (map[string][]string, error) {
 }
 
 func (es *Environments) DeleteRemotePolicies() error {
-	var errs Errors
+	err := es.CreateGraphClients()
+	if err != nil {
+		return err
+	}
 
+	var errs Errors
 	for _, e := range es.e {
 		err := e.DeleteRemotePolicies()
 		if err != nil {
@@ -348,8 +381,12 @@ func (es *Environments) DeleteRemotePolicies() error {
 }
 
 func (es *Environments) FixAppRegistrations() error {
-	var errs Errors
+	err := es.CreateGraphClients()
+	if err != nil {
+		return err
+	}
 
+	var errs Errors
 	for _, e := range es.e {
 		err := e.FixAppRegistrations()
 		if err != nil {
@@ -365,8 +402,12 @@ func (es *Environments) FixAppRegistrations() error {
 }
 
 func (es *Environments) CreateKeySets() error {
-	var errs Errors
+	err := es.CreateGraphClients()
+	if err != nil {
+		return err
+	}
 
+	var errs Errors
 	for _, e := range es.e {
 		err := e.CreateKeySets()
 		if err != nil {
@@ -382,8 +423,12 @@ func (es *Environments) CreateKeySets() error {
 }
 
 func (es *Environments) DeleteKeySets() error {
-	var errs Errors
+	err := es.CreateGraphClients()
+	if err != nil {
+		return err
+	}
 
+	var errs Errors
 	for _, e := range es.e {
 		err := e.DeleteKeySets()
 		if err != nil {

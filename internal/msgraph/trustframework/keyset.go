@@ -1,5 +1,7 @@
 package trustframework
 
+import "strings"
+
 type KeySet struct {
 	IDs []string
 }
@@ -10,6 +12,10 @@ func NewKeySet(ids []string) *KeySet {
 
 func (ks *KeySet) Add(s string) {
 	ks.IDs = append(ks.IDs, s)
+}
+
+func (ks *KeySet) String() string {
+	return strings.Join(ks.IDs, ", ")
 }
 
 func (ks *KeySet) Remove(s string) {

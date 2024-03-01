@@ -3,13 +3,15 @@ package vault
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"os"
 	"time"
 
 	"github.com/hashicorp/vault-client-go"
 	"github.com/hashicorp/vault-client-go/schema"
+	"gopkg.in/op/go-logging.v1"
 )
+
+var log = logging.MustGetLogger("internal/vault")
 
 type Client struct {
 	Secrets   vault.Secrets
@@ -24,10 +26,14 @@ type Secret struct {
 }
 
 func NewClient() *Client {
+	log.Debug("creating client for: %s", os.Getenv("VAULT_ADDR"))
 	c, err := vault.New(
 		vault.WithAddress(os.Getenv("VAULT_ADDR")),
 		vault.WithRequestTimeout(30*time.Second),
 	)
+
+	// @TODO: remove VAULT_SECRET_ID from debug log output
+	log.Debug("authenticating role %s: %s", os.Getenv("VAULT_ROLE_ID"), os.Getenv("VAULT_SECRET_ID"))
 	s, err := c.Auth.AppRoleLogin(
 		context.Background(),
 		schema.AppRoleLoginRequest{
@@ -44,6 +50,7 @@ func NewClient() *Client {
 		log.Fatal(err)
 	}
 
+	log.Debug("using mount path: %s", os.Getenv("VAULT_SECRET_MOUNT_PATH"))
 	vc := &Client{
 		Secrets:   c.Secrets,
 		MountPath: os.Getenv("VAULT_SECRET_MOUNT_PATH"),

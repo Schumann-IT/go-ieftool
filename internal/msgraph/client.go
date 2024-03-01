@@ -18,6 +18,8 @@ type Client struct {
 }
 
 func NewClient(tid, cid, s string) (*Client, error) {
+	log.Debug("creating client for: %s", tid)
+
 	g := &Client{
 		Scopes: []string{"https://graph.microsoft.com/.default"},
 	}

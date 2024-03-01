@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -48,6 +47,7 @@ func (env Environment) Build(s string, d string) error {
 	var errs Errors
 	root := s
 	err := filepath.WalkDir(s, func(p string, e fs.DirEntry, err error) error {
+		log.Debugf("processing dir: %s", s)
 		if err != nil {
 			return err
 		}
@@ -66,16 +66,17 @@ func (env Environment) Build(s string, d string) error {
 				errs = append(errs, ve)
 				return nil
 			}
-			log.Printf("Compiled %s", t)
+			log.Debugf("compiled: %s", t)
 			if env.IsProduction {
 				// @TODO remove debug code
-				log.Print("Removed debug parameters as this is a prod environment.")
+				log.Debug("removed debug parameters as this is a prod environment.")
 			}
 			ve = os.WriteFile(t, c, os.ModePerm)
 			if ve != nil {
 				errs = append(errs, ve)
 				return nil
 			}
+			log.Debugf("processed file: %s", t)
 		}
 		return nil
 	})
@@ -91,6 +92,8 @@ func (env Environment) Build(s string, d string) error {
 }
 
 func (env Environment) replaceVariables(p string) ([]byte, error) {
+	log.Debugf("replacing variables for: %s", p)
+
 	content, err := os.ReadFile(p)
 	policy := string(content)
 	if err != nil {
@@ -155,7 +158,7 @@ func (env Environment) Deploy(d string) error {
 	bs := ps.GetBatch()
 
 	for i, b := range bs {
-		log.Printf("Processing batch %d", i)
+		log.Debugf("processing batch %d", i)
 		env.GraphClient.UploadPolicies(b)
 	}
 
@@ -176,7 +179,7 @@ func (env Environment) FixAppRegistrations() error {
 	}
 	err := env.GraphClient.FixAppRegistration(*env.IdentityExperienceFrameworkAppObjectId, iefApplicationPatch)
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatal(err)
 	}
 
 	if env.Saml != nil && env.Saml.AppObjectId != nil {
@@ -187,11 +190,11 @@ func (env Environment) FixAppRegistrations() error {
 		}
 		patch, err := json.Marshal(p)
 		if err != nil {
-			log.Fatalln(err)
+			log.Fatal(err)
 		}
 		err = env.GraphClient.FixAppRegistration(*env.Saml.AppObjectId, patch)
 		if err != nil {
-			log.Fatalln(err)
+			log.Fatal(err)
 		}
 	}
 
@@ -255,6 +258,14 @@ func NewEnvironmentsFromConfig(p string, n string) (*Environments, error) {
 
 func (es *Environments) Len() int {
 	return len(es.e)
+}
+
+func (es *Environments) String() string {
+	var s []string
+	for _, e := range es.e {
+		s = append(s, e.Name)
+	}
+	return strings.Join(s, ", ")
 }
 
 func (es *Environments) Build(s string, d string) error {

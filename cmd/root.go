@@ -1,18 +1,28 @@
 package cmd
 
 import (
-	"log"
 	"os"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/op/go-logging.v1"
 )
 
+var log = logging.MustGetLogger("cmd")
+
 var rootCmd = &cobra.Command{
 	Use:   "ieftool",
 	Short: "Tooling for Azure B2C Identity Experience Framework",
-	PersistentPreRun: func(_ *cobra.Command, _ []string) {
-		logging.SetLevel(logging.INFO, "")
+	PersistentPreRun: func(cmd *cobra.Command, _ []string) {
+		lvl := logging.INFO
+		isDebug, _ := cmd.Flags().GetBool("debug")
+		if isDebug {
+			lvl = logging.DEBUG
+		}
+		logging.SetLevel(lvl, "")
+		logging.SetFormatter(logging.MustStringFormatter(
+			`%{color}%{level}(%{module})%{color:reset} %{message}`,
+		))
+		log = logging.MustGetLogger("cmd")
 	},
 }
 
@@ -42,12 +52,13 @@ func init() {
 }
 
 func globalFlags(cmd *cobra.Command) {
+	cmd.Flags().Bool("debug", false, "Enable debug mode")
 	cmd.Flags().StringP("config", "c", "./config.yaml", "Path to the ieftool configuration file")
 	cmd.Flags().StringP("environment", "e", "", "Environment to deploy (default: all environments)")
 }
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		log.Fatalln(err)
+		log.Fatal(err)
 	}
 }

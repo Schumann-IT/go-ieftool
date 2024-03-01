@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 )
 
@@ -16,7 +15,7 @@ func (c *Client) FixAppRegistration(id string, patch []byte) error {
 	ep := fmt.Sprintf("https://graph.microsoft.com/beta/applications/%s", id)
 	req, err := http.NewRequest(http.MethodPatch, ep, bytes.NewBuffer(patch))
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatal(err)
 	}
 
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
@@ -24,14 +23,14 @@ func (c *Client) FixAppRegistration(id string, patch []byte) error {
 	resp, err := client.Do(req)
 
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatal(err)
 	}
 
 	if resp.StatusCode >= 400 {

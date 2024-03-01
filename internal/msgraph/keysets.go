@@ -2,7 +2,6 @@ package msgraph
 
 import (
 	"context"
-	"log"
 
 	"com.schumann-it.go-ieftool/internal/msgraph/trustframework"
 	"com.schumann-it.go-ieftool/internal/vault"
@@ -16,9 +15,11 @@ func (c *Client) CreateKeySets(s *vault.Secret) error {
 		n.Add("B2C_1A_SamlIdpCert")
 	}
 
+	log.Debugf("processing key sets: %s", n.String())
+
 	resp, err := c.GraphServiceClient.TrustFramework().KeySets().Get(context.Background(), nil)
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatal(err)
 	}
 	for _, ks := range resp.GetValue() {
 		id := ks.GetId()
@@ -30,19 +31,19 @@ func (c *Client) CreateKeySets(s *vault.Secret) error {
 		case "B2C_1A_TokenSigningKeyContainer":
 			err = c.createKeySet(id, "sig")
 			if err != nil {
-				log.Fatalln(err)
+				log.Fatal(err)
 			}
 			break
 		case "B2C_1A_TokenEncryptionKeyContainer":
 			err = c.createKeySet(id, "enc")
 			if err != nil {
-				log.Fatalln(err)
+				log.Fatal(err)
 			}
 			break
 		case "B2C_1A_SamlIdpCert":
 			err = c.uploadCertificate(id, s.Cert, s.CertPassword)
 			if err != nil {
-				log.Fatalln(err)
+				log.Fatal(err)
 			}
 			break
 		default:

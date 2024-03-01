@@ -35,6 +35,10 @@ func NewClient() *Client {
 			SecretId: os.Getenv("VAULT_SECRET_ID"),
 		},
 	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	err = c.SetToken(s.Auth.ClientToken)
 	if err != nil {
 		log.Fatal(err)

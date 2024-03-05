@@ -6,9 +6,9 @@ import (
 )
 
 var deploy = &cobra.Command{
-	Use:   "deploy [path to policies]",
-	Short: "Deploy b2c policies.",
-	Long:  `Deploy b2c policies to B2C identity experience framework.`,
+	Use:   "deploy [path to policy]",
+	Short: "Deploy b2c policy.",
+	Long:  `Deploy b2c policy to B2C identity experience framework.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		e := internal.MustNewEnvironmentsFromFlags(cmd.Flags())
 		bd := internal.MustAbsPathFromFlag(cmd.Flags(), "build-dir")
@@ -16,7 +16,7 @@ var deploy = &cobra.Command{
 		log.Infof("deploying enviornment(s): %s", e.String())
 		err := e.Deploy(bd)
 		if err != nil {
-			log.Fatalf("failed to deploy policies %v", err)
+			log.Fatalf("failed to deploy policy %v", err)
 		}
 	},
 }

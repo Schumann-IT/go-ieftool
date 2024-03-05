@@ -380,7 +380,7 @@ func (es *Environments) DeleteRemotePolicies() error {
 	for _, e := range es.e {
 		err := e.DeleteRemotePolicies()
 		if err != nil {
-			errs = append(errs, errors.New(fmt.Sprintf("Failed to delete policies from environment %s: %s", e.Name, err)))
+			errs = append(errs, errors.New(fmt.Sprintf("Failed to delete policy from environment %s: %s", e.Name, err)))
 		}
 	}
 

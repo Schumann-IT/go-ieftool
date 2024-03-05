@@ -1,0 +1,6 @@
+- name: sp
+  tenant: test.onmicrosoft.com
+  secretProviderConfig:
+    name: env
+  settings:
+    Tenant: test.onmicrosoft.com

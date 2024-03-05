@@ -6,17 +6,17 @@ import (
 )
 
 var list = &cobra.Command{
-	Use:   "list [path to policies]",
-	Short: "List remote b2c policies.",
-	Long:  `List remote b2c policies from B2C identity experience framework.`,
+	Use:   "list [path to policy]",
+	Short: "List remote b2c policy.",
+	Long:  `List remote b2c policy from B2C identity experience framework.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		e := internal.MustNewEnvironmentsFromFlags(cmd.Flags())
 
-		log.Infof("fetching list of policies for enviornment(s): %s", e.String())
+		log.Infof("fetching list of policy for enviornment(s): %s", e.String())
 
 		ps, err := e.FetchRemotePolicies()
 		if err != nil {
-			log.Fatalf("failed to fetch policies %v", err)
+			log.Fatalf("failed to fetch policy %v", err)
 		}
 
 		for n, l := range ps {

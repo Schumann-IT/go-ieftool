@@ -1,0 +1,22 @@
+- name: test
+  tenant: test.onmicrosoft.com
+
+- name: test2
+  tenant: test2.onmicrosoft.com
+  isProduction: true
+  settings:
+    foo: "bar"
+
+- name: test2
+  tenant: test2.onmicrosoft.com
+  isProduction: true
+  applications:
+  - name: KeycloakYaml
+    objectId: aaaaaaaa-cccc-dddd-eeee-ffffffffffff
+    patch:
+      api:
+        acceptMappedClaims: null
+        requestedAccessTokenVersion: 2
+      isFallbackPublicClient: null
+      optionalClaims: null
+

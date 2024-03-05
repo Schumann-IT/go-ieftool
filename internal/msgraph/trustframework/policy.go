@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"com.schumann-it.go-ieftool/internal/tree"
+	"com.schumann-it.go-ieftool/pkg/b2c/policy/tree"
 )
 
 type PolicyB2C struct {
@@ -120,7 +120,7 @@ func (ps *Policies) checkDuplicate(policy *Policy) error {
 	}
 
 	if hasDuplicate {
-		return fmt.Errorf("found duplicate policies %s: %s", policy.PolicyId, policy.Path)
+		return fmt.Errorf("found duplicate policy %s: %s", policy.PolicyId, policy.Path)
 	}
 
 	return nil

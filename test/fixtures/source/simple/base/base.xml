@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<TrustFrameworkPolicy
+        xmlns="http://schemas.microsoft.com/online/cpim/schemas/2013/06"
+        PolicySchemaVersion="0.3.0.0"
+        TenantId="{Settings:Tenant}"
+        PolicyId="B2C_1A_TrustFrameworkBase"
+        PublicPolicyUri="http://{Settings:Tenant}/B2C_1A_TrustFrameworkBase">
+</TrustFrameworkPolicy>

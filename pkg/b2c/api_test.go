@@ -19,21 +19,21 @@ var (
 	testSourceDir         = ""
 )
 
-func setup(t *testing.T, env string) *Api {
+func setup(t *testing.T, env string) *Service {
 	_ = os.RemoveAll(testBuildTargetDir)
 
 	r, err := filepath.Abs(testBaseDir)
 	cp := fmt.Sprintf("%s.yaml", path.Join(testBaseDir, testFixturesConfigDir, env))
 	testSourceDir = path.Join(r, testFixturesSourceDir, env)
-	a, err := NewApi(cp, testSourceDir, testBuildTargetDir)
+	s, err := NewService(cp, testSourceDir, testBuildTargetDir)
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
 
-	return a
+	return s
 }
 
-func Test_NewApi(t *testing.T) {
+func Test_NewService(t *testing.T) {
 	expected := environment.Config{
 		Name:   "simple",
 		Tenant: "test.onmicrosoft.com",
@@ -42,8 +42,8 @@ func Test_NewApi(t *testing.T) {
 		},
 	}
 
-	a := setup(t, "simple")
-	actual := a.FindConfig(expected.Name)
+	s := setup(t, "simple")
+	actual := s.findConfig(expected.Name)
 
 	assert.Equal(t, expected, *actual)
 }
@@ -65,7 +65,7 @@ func Test_CreateDeployBatch(t *testing.T) {
 	a := setup(t, "simple")
 	_ = a.BuildPolicies("simple")
 
-	_, err := a.Batch("simple")
+	_, err := a.batch("simple")
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}

@@ -44,7 +44,7 @@ var buildNew = &cobra.Command{
 		sd := internal.MustAbsPathFromFlag(cmd.Flags(), "source")
 		dd := internal.MustAbsPathFromFlag(cmd.Flags(), "destination")
 
-		a, err := b2c.NewApi(cf, sd, dd)
+		a, err := b2c.NewService(cf, sd, dd)
 		if err != nil {
 			log.Fatalf("could build environment %s: %s", en, err.Error())
 		}

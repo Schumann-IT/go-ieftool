@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"log"
-
 	"com.schumann-it.go-ieftool/internal"
 	"github.com/spf13/cobra"
 )
@@ -11,16 +9,15 @@ var deploy = &cobra.Command{
 	Use:   "deploy [path to policies]",
 	Short: "Deploy b2c policies.",
 	Long:  `Deploy b2c policies to B2C identity experience framework.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	Run: func(cmd *cobra.Command, args []string) {
 		e := internal.MustNewEnvironmentsFromFlags(cmd.Flags())
 		bd := internal.MustAbsPathFromFlag(cmd.Flags(), "build-dir")
 
+		log.Infof("deploying enviornment(s): %s", e.String())
 		err := e.Deploy(bd)
 		if err != nil {
 			log.Fatalf("failed to deploy policies %v", err)
 		}
-
-		return nil
 	},
 }
 

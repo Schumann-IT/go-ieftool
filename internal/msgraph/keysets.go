@@ -2,25 +2,24 @@ package msgraph
 
 import (
 	"context"
-	"fmt"
-	"log"
-	"os"
 
 	"com.schumann-it.go-ieftool/internal/msgraph/trustframework"
+	"com.schumann-it.go-ieftool/internal/vault"
 	sdkmodels "github.com/microsoftgraph/msgraph-beta-sdk-go/models"
 	sdktrustframework "github.com/microsoftgraph/msgraph-beta-sdk-go/trustframework"
 )
 
-func (c *Client) CreateKeySets(cert []byte, pwVar string) error {
+func (c *Client) CreateKeySets(s *vault.Secret) error {
 	n := trustframework.NewKeySet([]string{"B2C_1A_TokenSigningKeyContainer", "B2C_1A_TokenEncryptionKeyContainer"})
-	pw := os.Getenv(pwVar)
-	if cert != nil {
+	if s != nil {
 		n.Add("B2C_1A_SamlIdpCert")
 	}
 
+	log.Debugf("processing key sets: %s", n.String())
+
 	resp, err := c.GraphServiceClient.TrustFramework().KeySets().Get(context.Background(), nil)
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatal(err)
 	}
 	for _, ks := range resp.GetValue() {
 		id := ks.GetId()
@@ -32,22 +31,19 @@ func (c *Client) CreateKeySets(cert []byte, pwVar string) error {
 		case "B2C_1A_TokenSigningKeyContainer":
 			err = c.createKeySet(id, "sig")
 			if err != nil {
-				log.Fatalln(err)
+				log.Fatal(err)
 			}
 			break
 		case "B2C_1A_TokenEncryptionKeyContainer":
 			err = c.createKeySet(id, "enc")
 			if err != nil {
-				log.Fatalln(err)
+				log.Fatal(err)
 			}
 			break
 		case "B2C_1A_SamlIdpCert":
-			if pw == "" {
-				return fmt.Errorf("no password for saml cert found. Did ypu set %s?", pwVar)
-			}
-			err = c.uploadCertificate(id, string(cert), pw)
+			err = c.uploadCertificate(id, s.Cert, s.CertPassword)
 			if err != nil {
-				log.Fatalln(err)
+				log.Fatal(err)
 			}
 			break
 		default:

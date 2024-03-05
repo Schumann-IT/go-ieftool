@@ -3,7 +3,6 @@ package trustframework
 import (
 	"encoding/xml"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,7 +26,6 @@ type PolicyIdB2C struct {
 func (p *PolicyB2C) isPolicy(content []byte) bool {
 	err := xml.Unmarshal(content, p)
 	if err != nil {
-		log.Printf("")
 		return false
 	}
 	return p.PolicyId != ""
@@ -51,7 +49,7 @@ func NewPolicy(content []byte, filePath string) (*Policy, error) {
 	}
 	if len(b2cPolicy.BasePolicy) > 0 {
 		parentPolicyId := b2cPolicy.BasePolicy[0].PolicyId[0].Value
-		log.Printf("%s found parent policy id %s", b2cPolicy.PolicyId, parentPolicyId)
+		log.Debugf("%s found parent policy id %s", b2cPolicy.PolicyId, parentPolicyId)
 		policy.ParentPolicyId = strings.ToLower(parentPolicyId)
 	}
 	return policy, nil
@@ -129,15 +127,15 @@ func (ps *Policies) checkDuplicate(policy *Policy) error {
 }
 
 func (ps *Policies) GetBatch() [][]Policy {
-	log.Println("Building Policy Tree")
+	log.Debug("Building Policy Tree")
 	rp := ps.findRoot()
 	r := tree.NewBranch(rp)
 	ps.recursiveAddBranch(&r)
 
 	batch := &[][]Policy{}
-	log.Println("Determining batches")
+	log.Debug("Determining batches")
 	ps.getBatch([]tree.Branch[Policy]{r}, batch)
-	log.Printf("Found %d batches", len(*batch))
+	log.Debugf("Found %d batches", len(*batch))
 
 	return *batch
 }

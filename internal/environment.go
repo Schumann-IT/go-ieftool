@@ -6,14 +6,15 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"log"
 	"os"
 	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
 
+	"com.schumann-it.go-ieftool/internal/msgraph"
 	"com.schumann-it.go-ieftool/internal/msgraph/trustframework"
+	"com.schumann-it.go-ieftool/internal/vault"
 	"github.com/spf13/pflag"
 	"gopkg.in/yaml.v3"
 )
@@ -27,25 +28,26 @@ var samlApplicationPatch []byte
 type EnvironmentSaml struct {
 	AppObjectId *string `yaml:"appObjectId,omitempty"`
 	MetadataUrl *string `yaml:"metadataUrl,omitempty"`
-	CertPath    *string `yaml:"certPath,omitempty"`
-	Cert        []byte
 }
 
 type Environment struct {
 	Name                                   string                 `yaml:"name"`
+	SecretPath                             string                 `yaml:"secretPath"`
 	IsProduction                           bool                   `yaml:"isProduction"`
 	Tenant                                 string                 `yaml:"tenant"`
 	TenantId                               string                 `yaml:"tenantId"`
-	ClientId                               string                 `yaml:"clientId"`
 	IdentityExperienceFrameworkAppObjectId *string                `yaml:"identityExperienceFrameworkAppObjectId,omitempty"`
 	Saml                                   *EnvironmentSaml       `yaml:"saml,omitempty"`
 	Settings                               map[string]interface{} `yaml:"settings"`
+	Secret                                 *vault.Secret
+	GraphClient                            *msgraph.Client
 }
 
 func (env Environment) Build(s string, d string) error {
 	var errs Errors
 	root := s
 	err := filepath.WalkDir(s, func(p string, e fs.DirEntry, err error) error {
+		log.Debugf("processing dir: %s", s)
 		if err != nil {
 			return err
 		}
@@ -64,16 +66,17 @@ func (env Environment) Build(s string, d string) error {
 				errs = append(errs, ve)
 				return nil
 			}
-			log.Printf("Compiled %s", t)
+			log.Debugf("compiled: %s", t)
 			if env.IsProduction {
 				// @TODO remove debug code
-				log.Print("Removed debug parameters as this is a prod environment.")
+				log.Debug("removed debug parameters as this is a prod environment.")
 			}
 			ve = os.WriteFile(t, c, os.ModePerm)
 			if ve != nil {
 				errs = append(errs, ve)
 				return nil
 			}
+			log.Debugf("processed file: %s", t)
 		}
 		return nil
 	})
@@ -89,6 +92,8 @@ func (env Environment) Build(s string, d string) error {
 }
 
 func (env Environment) replaceVariables(p string) ([]byte, error) {
+	log.Debugf("replacing variables for: %s", p)
+
 	content, err := os.ReadFile(p)
 	policy := string(content)
 	if err != nil {
@@ -152,49 +157,29 @@ func (env Environment) Deploy(d string) error {
 	}
 	bs := ps.GetBatch()
 
-	g, err := NewGraphClientFromEnvironment(env)
-	if err != nil {
-		return err
-	}
-
 	for i, b := range bs {
-		log.Printf("Processing batch %d", i)
-		g.UploadPolicies(b)
+		log.Debugf("processing batch %d", i)
+		env.GraphClient.UploadPolicies(b)
 	}
 
 	return nil
 }
 
 func (env Environment) ListRemotePolicies() ([]string, error) {
-	g, err := NewGraphClientFromEnvironment(env)
-	if err != nil {
-		return nil, err
-	}
-
-	return g.ListPolicies()
+	return env.GraphClient.ListPolicies()
 }
 
 func (env Environment) DeleteRemotePolicies() error {
-	g, err := NewGraphClientFromEnvironment(env)
-	if err != nil {
-		return err
-	}
-
-	return g.DeletePolicies()
+	return env.GraphClient.DeletePolicies()
 }
 
 func (env Environment) FixAppRegistrations() error {
-	g, err := NewGraphClientFromEnvironment(env)
-	if err != nil {
-		return err
-	}
-
 	if env.IdentityExperienceFrameworkAppObjectId == nil {
 		return fmt.Errorf("please specify identityExperienceFrameworkObjectId in envirnment")
 	}
-	err = g.FixAppRegistration(*env.IdentityExperienceFrameworkAppObjectId, iefApplicationPatch)
+	err := env.GraphClient.FixAppRegistration(*env.IdentityExperienceFrameworkAppObjectId, iefApplicationPatch)
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatal(err)
 	}
 
 	if env.Saml != nil && env.Saml.AppObjectId != nil {
@@ -205,11 +190,11 @@ func (env Environment) FixAppRegistrations() error {
 		}
 		patch, err := json.Marshal(p)
 		if err != nil {
-			log.Fatalln(err)
+			log.Fatal(err)
 		}
-		err = g.FixAppRegistration(*env.Saml.AppObjectId, patch)
+		err = env.GraphClient.FixAppRegistration(*env.Saml.AppObjectId, patch)
 		if err != nil {
-			log.Fatalln(err)
+			log.Fatal(err)
 		}
 	}
 
@@ -217,23 +202,11 @@ func (env Environment) FixAppRegistrations() error {
 }
 
 func (env Environment) CreateKeySets() error {
-	g, err := NewGraphClientFromEnvironment(env)
-	if err != nil {
-		return err
-	}
-
-	es := strings.ReplaceAll(fmt.Sprintf("B2C_SAML_CERT_PW_%s", strings.ToUpper(env.Name)), "-", "_")
-
-	return g.CreateKeySets(env.Saml.Cert, es)
+	return env.GraphClient.CreateKeySets(env.Secret)
 }
 
 func (env Environment) DeleteKeySets() interface{} {
-	g, err := NewGraphClientFromEnvironment(env)
-	if err != nil {
-		return err
-	}
-
-	return g.DeleteKeySets()
+	return env.GraphClient.DeleteKeySets()
 }
 
 type Environments struct {
@@ -280,25 +253,19 @@ func NewEnvironmentsFromConfig(p string, n string) (*Environments, error) {
 	es.e = e
 	es.filter(n)
 
-	for i, _ := range es.e {
-		if es.e[i].Saml.CertPath != nil {
-			sp, err := filepath.Abs(*es.e[i].Saml.CertPath)
-			if err != nil {
-				return nil, errors.New(fmt.Sprintf("Could not find saml cert %s: %s", *es.e[i].Saml.CertPath, err.Error()))
-			}
-			b, err := os.ReadFile(sp)
-			if err != nil {
-				return nil, errors.New(fmt.Sprintf("Could not read saml cert %s: %s", p, err.Error()))
-			}
-			es.e[i].Saml.Cert = b
-		}
-	}
-
 	return &es, nil
 }
 
 func (es *Environments) Len() int {
 	return len(es.e)
+}
+
+func (es *Environments) String() string {
+	var s []string
+	for _, e := range es.e {
+		s = append(s, e.Name)
+	}
+	return strings.Join(s, ", ")
 }
 
 func (es *Environments) Build(s string, d string) error {
@@ -315,9 +282,49 @@ func (es *Environments) Build(s string, d string) error {
 	return nil
 }
 
-func (es *Environments) Deploy(d string) error {
-	es.d = d
+func (es *Environments) FetchSecrets() error {
+	vc := vault.NewClient()
 
+	for i, _ := range es.e {
+		if es.e[i].Secret == nil {
+			sp := fmt.Sprintf("%s/%s", es.e[i].SecretPath, es.e[i].Name)
+			s, err := vc.GetSecret(sp)
+			if err != nil {
+				return errors.New(fmt.Sprintf("could not find secret %s: %s", sp, err.Error()))
+			}
+			es.e[i].Secret = s
+		}
+	}
+
+	return nil
+}
+
+func (es *Environments) CreateGraphClients() error {
+	err := es.FetchSecrets()
+	if err != nil {
+		return err
+	}
+
+	for i, _ := range es.e {
+		if es.e[i].GraphClient == nil {
+			c, err := msgraph.NewClient(es.e[i].TenantId, es.e[i].Secret.ClientId, es.e[i].Secret.ClientSecret)
+			if err != nil {
+				return fmt.Errorf("could not create graph client: %s", err.Error())
+			}
+			es.e[i].GraphClient = c
+		}
+	}
+
+	return nil
+}
+
+func (es *Environments) Deploy(d string) error {
+	err := es.CreateGraphClients()
+	if err != nil {
+		return err
+	}
+
+	es.d = d
 	for _, e := range es.e {
 		err := e.Deploy(es.d)
 		if err != nil {
@@ -340,9 +347,13 @@ func (es *Environments) filter(n string) {
 	es.e = ne
 }
 
-func (es *Environments) ListRemotePolicies() (map[string][]string, error) {
-	var errs Errors
+func (es *Environments) FetchRemotePolicies() (map[string][]string, error) {
+	err := es.CreateGraphClients()
+	if err != nil {
+		return nil, err
+	}
 
+	var errs Errors
 	r := map[string][]string{}
 	for _, e := range es.e {
 		ps, err := e.ListRemotePolicies()
@@ -360,8 +371,12 @@ func (es *Environments) ListRemotePolicies() (map[string][]string, error) {
 }
 
 func (es *Environments) DeleteRemotePolicies() error {
-	var errs Errors
+	err := es.CreateGraphClients()
+	if err != nil {
+		return err
+	}
 
+	var errs Errors
 	for _, e := range es.e {
 		err := e.DeleteRemotePolicies()
 		if err != nil {
@@ -377,8 +392,12 @@ func (es *Environments) DeleteRemotePolicies() error {
 }
 
 func (es *Environments) FixAppRegistrations() error {
-	var errs Errors
+	err := es.CreateGraphClients()
+	if err != nil {
+		return err
+	}
 
+	var errs Errors
 	for _, e := range es.e {
 		err := e.FixAppRegistrations()
 		if err != nil {
@@ -394,8 +413,12 @@ func (es *Environments) FixAppRegistrations() error {
 }
 
 func (es *Environments) CreateKeySets() error {
-	var errs Errors
+	err := es.CreateGraphClients()
+	if err != nil {
+		return err
+	}
 
+	var errs Errors
 	for _, e := range es.e {
 		err := e.CreateKeySets()
 		if err != nil {
@@ -411,8 +434,12 @@ func (es *Environments) CreateKeySets() error {
 }
 
 func (es *Environments) DeleteKeySets() error {
-	var errs Errors
+	err := es.CreateGraphClients()
+	if err != nil {
+		return err
+	}
 
+	var errs Errors
 	for _, e := range es.e {
 		err := e.DeleteKeySets()
 		if err != nil {
